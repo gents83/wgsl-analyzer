@@ -34,7 +34,7 @@ pub trait SourceDatabase {
     fn parse_no_preprocessor(&self, file_id: FileId) -> syntax::Parse;
 
     #[salsa::invoke(parse_with_unconfigured_query)]
-    fn parse_with_unconfigured(&self, file_id: FileId) -> (Parse, Arc<Vec<UnconfiguredCode>>);
+    fn parse_with_unconfigured(&self, file_id: FileId) -> (Parse, Arc<Vec<DiagnosticResult>>);
 
     #[salsa::invoke(parse_query)]
     fn parse(&self, file_id: FileId) -> Parse;
@@ -68,31 +68,45 @@ fn parse_import_no_preprocessor_query(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnconfiguredCode {
-    pub range: TextRange,
-    pub def: String,
+pub enum DiagnosticResult {
+    UnconfiguredCode { range: TextRange, def: String },
+    UnresolvedImport { range: TextRange, filepath: String },
 }
 
 fn parse_with_unconfigured_query(
     db: &dyn SourceDatabase,
     file_id: FileId,
-) -> (Parse, Arc<Vec<UnconfiguredCode>>) {
+) -> (Parse, Arc<Vec<DiagnosticResult>>) {
     let shader_defs = db.shader_defs();
     let source = db.file_text(file_id);
 
     let mut unconfigured = Vec::new();
+    let mut file_to_import = Vec::new();
 
-    let processed_source =
-        shader_processor::SHADER_PROCESSOR.process(&source, &shader_defs, |range, def| {
+    let processed_source = shader_processor::SHADER_PROCESSOR.process(
+        &source,
+        &shader_defs,
+        |range, def| {
             let range = TextRange::new(
                 TextSize::from(range.start as u32),
                 TextSize::from(range.end as u32),
             );
-            unconfigured.push(UnconfiguredCode {
+            unconfigured.push(DiagnosticResult::UnconfiguredCode {
                 range,
                 def: def.to_string(),
             })
-        });
+        },
+        |range, filepath| {
+            let range = TextRange::new(
+                TextSize::from(range.start as u32),
+                TextSize::from(range.end as u32),
+            );
+            file_to_import.push((range, filepath.to_string()));
+        },
+    );
+    for (range, filepath) in file_to_import {
+        unconfigured.push(DiagnosticResult::UnresolvedImport { range, filepath });
+    }
     let parse = syntax::parse(&processed_source);
     (parse, Arc::new(unconfigured))
 }
@@ -107,6 +121,6 @@ fn parse_import_query(db: &dyn SourceDatabase, key: String) -> Result<Parse, ()>
     let source = imports.get(&key).ok_or(())?;
 
     let processed_source =
-        shader_processor::SHADER_PROCESSOR.process(source, &shader_defs, |_, _| {});
+        shader_processor::SHADER_PROCESSOR.process(source, &shader_defs, |_, _| {}, |_, _| {});
     Ok(syntax::parse(&processed_source))
 }

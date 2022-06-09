@@ -104,7 +104,7 @@ pub enum SyntaxKind {
     /// Type alias declaration: type float4 = vec4<f32>
     TypeAliasDecl,
 
-    /// `#import foo` or `#import "file.wgsl"`
+    /// `#import '.\folder\file.wgsl'` or `#import 'file.wgsl' or `#import '\\dir\file.h'
     Import,
     ImportPath,
     ImportCustom,
@@ -117,7 +117,7 @@ pub enum SyntaxKind {
     UnofficialPreprocessorEndif,
     #[regex("#else.*")]
     UnofficialPreprocessorElse,
-    #[regex("#import")]
+    #[regex("#import.*")]
     UnofficialPreprocessorImport,
     #[regex("#define_import_path.*")]
     UnofficialPreprocessorDefineImportPath,

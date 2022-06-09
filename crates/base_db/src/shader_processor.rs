@@ -10,16 +10,24 @@ pub struct ShaderProcessor {
     ifndef_regex: Regex,
     else_regex: Regex,
     endif_regex: Regex,
+    import_regex: Regex,
     define_import_path_regex: Regex,
 }
 
 impl Default for ShaderProcessor {
     fn default() -> Self {
+        let mut import_regex_string = String::from(r"^\s*#\s*import\s*");
+        import_regex_string.push_str("\"(");
+        import_regex_string.push_str(r"(\w:|\\|([a-z_\-\s0-9\.]))*(\\([a-z_\-\s0-9\.])+)*");
+        import_regex_string.push_str("\\.");
+        import_regex_string.push_str(r"([a-zA-Z0-9])+");
+        import_regex_string.push_str("){1}\"");
         Self {
             ifdef_regex: Regex::new(r"^\s*#\s*ifdef\s*([\w|\d|_]+)").unwrap(),
             ifndef_regex: Regex::new(r"^\s*#\s*ifndef\s*([\w|\d|_]+)").unwrap(),
             else_regex: Regex::new(r"^\s*#\s*else").unwrap(),
             endif_regex: Regex::new(r"^\s*#\s*endif").unwrap(),
+            import_regex: Regex::new(&import_regex_string).unwrap(),
             define_import_path_regex: Regex::new(r"^\s*#\s*define_import_path").unwrap(),
         }
     }
@@ -31,8 +39,14 @@ impl ShaderProcessor {
         shader_str: &str,
         shader_defs: &HashSet<String>,
         mut emit_unconfigured: impl FnMut(Range<usize>, &str),
+        mut emit_request_import_file: impl FnMut(Range<usize>, &str),
     ) -> String {
-        self.process_inner(shader_str, shader_defs, &mut emit_unconfigured)
+        self.process_inner(
+            shader_str,
+            shader_defs,
+            &mut emit_unconfigured,
+            &mut emit_request_import_file,
+        )
     }
 
     fn process_inner(
@@ -40,6 +54,7 @@ impl ShaderProcessor {
         shader_str: &str,
         shader_defs: &HashSet<String>,
         emit_unconfigured: &mut dyn FnMut(Range<usize>, &str),
+        emit_request_import_file: &mut dyn FnMut(Range<usize>, &str),
     ) -> String {
         let mut scopes = vec![(true, 0, "root scope")];
         let mut final_string = String::with_capacity(shader_str.len());
@@ -89,6 +104,13 @@ impl ShaderProcessor {
                     // return Err(ProcessShaderError::TooManyEndIfs);
                 }
                 false
+            } else if self.import_regex.is_match(line) {
+                if let Some(cap) = self.import_regex.captures(line) {
+                    let filepath = cap.get(1).unwrap().as_str();
+                    let range = offset..offset + line.len();
+                    emit_request_import_file(range, &filepath);
+                }
+                true
             } else if self.define_import_path_regex.is_match(line) {
                 false
             } else {
@@ -129,7 +151,7 @@ mod tests {
     fn test_shader(input: &str, defs: &[&str], output: &str) {
         let processor = ShaderProcessor::default();
         let defs = HashSet::from_iter(defs.iter().map(|s| s.to_string()));
-        let result = processor.process(input, &defs, |_, _| {});
+        let result = processor.process(input, &defs, |_, _| {}, |_, _| {});
 
         pretty_assertions::assert_eq!(result, output);
     }

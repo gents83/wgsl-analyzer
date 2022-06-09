@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use base_db::{FileRange, TextRange, TextSize};
+use base_db::{DiagnosticResult, FileRange, TextRange, TextSize};
 use hir::{
     diagnostics::{AnyDiagnostic, DiagnosticsConfig, NagaVersion},
     HirDatabase, Semantics,
@@ -279,15 +279,18 @@ pub fn diagnostics(
             }),
     );
 
-    diagnostics.extend(
-        unconfigured
-            .iter()
-            .map(|unconfigured| AnyDiagnostic::UnconfiguredCode {
-                def: unconfigured.def.clone(),
-                range: unconfigured.range,
-                file_id: file_id.into(),
-            }),
-    );
+    diagnostics.extend(unconfigured.iter().map(|unconfigured| match unconfigured {
+        DiagnosticResult::UnconfiguredCode { range, def } => AnyDiagnostic::UnconfiguredCode {
+            def: def.clone(),
+            range: range.clone(),
+            file_id: file_id.into(),
+        },
+        DiagnosticResult::UnresolvedImport { range, filepath } => AnyDiagnostic::ParseError {
+            message: format!("Unable to find file {}", filepath),
+            range: range.clone(),
+            file_id: file_id.into(),
+        },
+    }));
 
     let sema = Semantics::new(db);
 
