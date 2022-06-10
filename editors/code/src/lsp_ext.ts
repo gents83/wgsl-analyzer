@@ -21,6 +21,16 @@ export const fullSource = new lc.RequestType<FullSourceParams, string, void>("wg
 
 export const requestConfiguration = new lc.RequestType<void, unknown, void>("wgsl-analyzer/requestConfiguration");
 
+export interface ReadFileInputParams {
+    identifier: String,
+    filepath: lc.TextDocumentIdentifier;
+}
+export interface ReadFileOutputParams {
+    identifier: String,
+    filepath: lc.TextDocumentIdentifier;
+    source: string;
+}
+export const readFile = new lc.RequestType<ReadFileInputParams, ReadFileOutputParams, void>("wgsl-analyzer/readFile");
 
 export interface InlayHintsParams {
     textDocument: lc.TextDocumentIdentifier;

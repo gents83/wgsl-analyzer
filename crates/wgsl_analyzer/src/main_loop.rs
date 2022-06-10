@@ -1,12 +1,15 @@
 use crate::config::Config;
 use crate::dispatch::NotificationDispatcher;
 use crate::global_state::file_id_to_url;
+use crate::lsp_ext::{ReadFileInputParams, ReadFileOutputParams};
 use crate::lsp_utils::is_cancelled;
 use crate::{dispatch::RequestDispatcher, global_state::GlobalState};
 use crate::{handlers, lsp_ext, Result};
 use base_db::SourceDatabase;
 use crossbeam_channel::{select, Receiver};
+use ide::diagnostics::READ_FILE_TAG;
 use lsp_server::Connection;
+use lsp_types::TextDocumentIdentifier;
 use salsa::Durability;
 use std::sync::Arc;
 use std::time::Instant;
@@ -60,6 +63,37 @@ impl GlobalState {
                 Task::Response(response) => self.respond(response),
                 Task::Diagnostics(diagnostics_per_file) => {
                     for (file_id, diagnostics) in diagnostics_per_file {
+                        //TODO: this is a bit of a hack, we should have a better way to
+                        for d in diagnostics.iter() {
+                            if d.message.starts_with(READ_FILE_TAG) {
+                                let identifier = d.message.replace(READ_FILE_TAG, "");
+                                let path = file_id_to_url(&self.vfs.read().unwrap().0, file_id);
+                                if let Ok(filepath) = path.join(&identifier) {
+                                    self.send_request::<lsp_ext::ReadFile>(
+                                        ReadFileInputParams {
+                                            identifier,
+                                            filepath: TextDocumentIdentifier::new(filepath),
+                                        },
+                                        |this, resp| {
+                                            let lsp_server::Response { error, result, .. } = resp;
+                                            if error.is_some() {
+                                                tracing::error!("Unable to read file");
+                                            }
+                                            if let Some(response) = result {
+                                                let output: ReadFileOutputParams =
+                                                    serde_json::from_value(response).unwrap();
+                                                let mut config = Config::clone(&*this.config);
+                                                config.custom_imports.insert(
+                                                    output.identifier,
+                                                    output.source,
+                                                );
+                                                this.update_configuration(config);
+                                            }
+                                        },
+                                    );
+                                }
+                            }
+                        }
                         self.diagnostics
                             .set_native_diagnostics(file_id, diagnostics)
                     }

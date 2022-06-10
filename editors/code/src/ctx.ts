@@ -74,6 +74,14 @@ export class Ctx {
             let options = await lspOptions(config);
             return options;
         }));
+        ctx.subscriptions.push(client.onRequest(lsp_ext.readFile, async (params, ct) => {
+            let source = await resolveImport(params.filepath.uri);
+            return {
+                identifier: params.identifier,
+                filepath: params.filepath,
+                source
+            };
+        }));
 
 
         return new Ctx(config, ctx, client);

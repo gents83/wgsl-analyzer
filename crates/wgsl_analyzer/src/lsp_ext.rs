@@ -53,6 +53,29 @@ impl Request for RequestConfiguration {
     const METHOD: &'static str = "wgsl-analyzer/requestConfiguration";
 }
 
+pub enum ReadFile {}
+
+impl Request for ReadFile {
+    type Params = ReadFileInputParams;
+    type Result = ReadFileOutputParams;
+    const METHOD: &'static str = "wgsl-analyzer/readFile";
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadFileInputParams {
+    pub identifier: String,
+    pub filepath: TextDocumentIdentifier,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadFileOutputParams {
+    pub identifier: String,
+    pub filepath: TextDocumentIdentifier,
+    pub source: String,
+}
+
 pub enum InlayHints {}
 
 impl Request for InlayHints {

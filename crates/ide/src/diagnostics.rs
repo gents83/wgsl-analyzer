@@ -12,6 +12,8 @@ use rowan::NodeOrToken;
 use syntax::AstNode;
 use vfs::FileId;
 
+pub const READ_FILE_TAG: &'static str = "ReadFile:";
+
 pub struct DiagnosticMessage {
     pub message: String,
     pub range: TextRange,
@@ -475,7 +477,16 @@ pub fn diagnostics(
             AnyDiagnostic::UnresolvedImport { import } => {
                 let source = import.value.to_node(&root);
                 let frange = original_file_range(db.upcast(), file_id, source.syntax());
-                DiagnosticMessage::new("unresolved import".to_string(), frange.range)
+                let line_string = source.syntax().to_string();
+                let start = line_string.find('"').unwrap_or_default();
+                let (_, line_string) = line_string.split_at(start + 1);
+                let end = line_string.find('"').unwrap_or_default();
+                let (line_string, _) = line_string.split_at(end);
+                if start > 0 && end > 0 && !line_string.is_empty() {
+                    DiagnosticMessage::new(format!("{}{}", READ_FILE_TAG, line_string), frange.range)
+                } else {
+                    DiagnosticMessage::new(format!("unable to resolve {}", source.syntax().to_string()), frange.range)
+                }
             }
             AnyDiagnostic::NagaValidationError { message, range, related, .. } => {
                 let mut msg = DiagnosticMessage::new(message, range);
