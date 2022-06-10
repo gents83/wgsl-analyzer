@@ -99,19 +99,14 @@ impl ShaderProcessor {
                 }
                 false
             } else if self.import_regex.is_match(line) {
-                let mut import_regex_string = String::from(r"^\s*#\s*import\s*");
-                import_regex_string.push_str("\"(");
-                import_regex_string.push_str(r"(\w:|\\|([a-z_\-\s0-9\.]))*(\\([a-z_\-\s0-9\.])+)*");
-                import_regex_string.push_str("\\.");
-                import_regex_string.push_str(r"([a-zA-Z0-9])+");
-                import_regex_string.push_str("){1}\"");
-                let valid_import_regex = Regex::new(&import_regex_string).unwrap();
-                if !valid_import_regex.is_match(line) {
-                    if let Some(cap) = self.import_regex.captures(line) {
-                        let filepath = cap.get(1).unwrap().as_str();
-                        let range = offset..offset + line.len();
-                        emit_request_import_file(range, &filepath);
-                    }
+                if let Some(cap) = self.import_regex.captures(line) {
+                    let line_string = cap.get(1).unwrap().as_str();
+                    let start = line_string.find('"').unwrap_or_default();
+                    let (_, line_string) = line_string.split_at(start + 1);
+                    let end = line_string.find('"').unwrap_or_default();
+                    let (line_string, _) = line_string.split_at(end);
+                    let range = offset..offset + line.len();
+                    emit_request_import_file(range, &line_string);
                 }
                 true
             } else if self.define_import_path_regex.is_match(line) {

@@ -34,7 +34,7 @@ pub trait SourceDatabase {
     fn parse_no_preprocessor(&self, file_id: FileId) -> syntax::Parse;
 
     #[salsa::invoke(parse_with_unconfigured_query)]
-    fn parse_with_unconfigured(&self, file_id: FileId) -> (Parse, Arc<Vec<DiagnosticResult>>);
+    fn parse_with_unconfigured(&self, file_id: FileId) -> (Parse, Arc<Vec<UnconfiguredCode>>);
 
     #[salsa::invoke(parse_query)]
     fn parse(&self, file_id: FileId) -> Parse;
@@ -68,15 +68,15 @@ fn parse_import_no_preprocessor_query(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DiagnosticResult {
-    UnconfiguredCode { range: TextRange, def: String },
-    UnresolvedImport { range: TextRange, filepath: String },
+pub struct UnconfiguredCode {
+    pub range: TextRange,
+    pub def: String,
 }
 
 fn parse_with_unconfigured_query(
     db: &dyn SourceDatabase,
     file_id: FileId,
-) -> (Parse, Arc<Vec<DiagnosticResult>>) {
+) -> (Parse, Arc<Vec<UnconfiguredCode>>) {
     let shader_defs = db.shader_defs();
     let source = db.file_text(file_id);
 
@@ -91,22 +91,34 @@ fn parse_with_unconfigured_query(
                 TextSize::from(range.start as u32),
                 TextSize::from(range.end as u32),
             );
-            unconfigured.push(DiagnosticResult::UnconfiguredCode {
+            unconfigured.push(UnconfiguredCode {
                 range,
                 def: def.to_string(),
             })
         },
-        |range, filepath| {
+        |range, identifier| {
             let range = TextRange::new(
                 TextSize::from(range.start as u32),
                 TextSize::from(range.end as u32),
             );
-            file_to_import.push((range, filepath.to_string()));
+            file_to_import.push((range, identifier.to_string()));
         },
     );
-    for (range, filepath) in file_to_import {
-        unconfigured.push(DiagnosticResult::UnresolvedImport { range, filepath });
+
+    let mut modified_source = processed_source.clone();
+    for (range, identifier) in file_to_import {
+        if let Some(source) = db.custom_imports().get(&identifier) {
+            let start_index: usize = range.start().into();
+            let end_index: usize = range.end().into();
+            let (pre, post) = processed_source.split_at(start_index);
+            let (_, end) = post.split_at(1usize + end_index - start_index);
+
+            modified_source = pre.to_string();
+            modified_source.push_str(source);
+            modified_source.push_str(end);
+        }
     }
+    let processed_source = modified_source;
     let parse = syntax::parse(&processed_source);
     (parse, Arc::new(unconfigured))
 }

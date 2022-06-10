@@ -76,7 +76,7 @@ impl GlobalState {
                                                 filepath: TextDocumentIdentifier::new(filepath),
                                             },
                                             |this, resp| {
-                                                let lsp_servAer::Response {
+                                                let lsp_server::Response {
                                                     error: _, result, ..
                                                 } = resp;
                                                 if let Some(response) = result {

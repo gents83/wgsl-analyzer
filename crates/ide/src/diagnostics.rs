@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use base_db::{DiagnosticResult, FileRange, TextRange, TextSize};
+use base_db::{FileRange, TextRange, TextSize, UnconfiguredCode};
 use hir::{
     diagnostics::{AnyDiagnostic, DiagnosticsConfig, NagaVersion},
     HirDatabase, Semantics,
@@ -282,23 +282,11 @@ pub fn diagnostics(
     );
 
     diagnostics.extend(unconfigured.iter().map(|unconfigured| match unconfigured {
-        DiagnosticResult::UnconfiguredCode { range, def } => AnyDiagnostic::UnconfiguredCode {
+        UnconfiguredCode { range, def } => AnyDiagnostic::UnconfiguredCode {
             def: def.clone(),
             range: range.clone(),
             file_id: file_id.into(),
         },
-        DiagnosticResult::UnresolvedImport { range, filepath } => {
-            let line: u32 = range.start().into();
-            AnyDiagnostic::ParseError {
-                message: format!(
-                    "#import {} is not correctly formatted at line {}",
-                    filepath,
-                    line + 1
-                ),
-                range: range.clone(),
-                file_id: file_id.into(),
-            }
-        }
     }));
 
     let sema = Semantics::new(db);
