@@ -16,18 +16,12 @@ pub struct ShaderProcessor {
 
 impl Default for ShaderProcessor {
     fn default() -> Self {
-        let mut import_regex_string = String::from(r"^\s*#\s*import\s*");
-        import_regex_string.push_str("\"(");
-        import_regex_string.push_str(r"(\w:|\\|([a-z_\-\s0-9\.]))*(\\([a-z_\-\s0-9\.])+)*");
-        import_regex_string.push_str("\\.");
-        import_regex_string.push_str(r"([a-zA-Z0-9])+");
-        import_regex_string.push_str("){1}\"");
         Self {
             ifdef_regex: Regex::new(r"^\s*#\s*ifdef\s*([\w|\d|_]+)").unwrap(),
             ifndef_regex: Regex::new(r"^\s*#\s*ifndef\s*([\w|\d|_]+)").unwrap(),
             else_regex: Regex::new(r"^\s*#\s*else").unwrap(),
             endif_regex: Regex::new(r"^\s*#\s*endif").unwrap(),
-            import_regex: Regex::new(&import_regex_string).unwrap(),
+            import_regex: Regex::new(r"^\s*#\s*import\s*(.*)*").unwrap(),
             define_import_path_regex: Regex::new(r"^\s*#\s*define_import_path").unwrap(),
         }
     }
@@ -105,10 +99,19 @@ impl ShaderProcessor {
                 }
                 false
             } else if self.import_regex.is_match(line) {
-                if let Some(cap) = self.import_regex.captures(line) {
-                    let filepath = cap.get(1).unwrap().as_str();
-                    let range = offset..offset + line.len();
-                    emit_request_import_file(range, &filepath);
+                let mut import_regex_string = String::from(r"^\s*#\s*import\s*");
+                import_regex_string.push_str("\"(");
+                import_regex_string.push_str(r"(\w:|\\|([a-z_\-\s0-9\.]))*(\\([a-z_\-\s0-9\.])+)*");
+                import_regex_string.push_str("\\.");
+                import_regex_string.push_str(r"([a-zA-Z0-9])+");
+                import_regex_string.push_str("){1}\"");
+                let valid_import_regex = Regex::new(&import_regex_string).unwrap();
+                if !valid_import_regex.is_match(line) {
+                    if let Some(cap) = self.import_regex.captures(line) {
+                        let filepath = cap.get(1).unwrap().as_str();
+                        let range = offset..offset + line.len();
+                        emit_request_import_file(range, &filepath);
+                    }
                 }
                 true
             } else if self.define_import_path_regex.is_match(line) {

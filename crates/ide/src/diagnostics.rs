@@ -285,11 +285,18 @@ pub fn diagnostics(
             range: range.clone(),
             file_id: file_id.into(),
         },
-        DiagnosticResult::UnresolvedImport { range, filepath } => AnyDiagnostic::ParseError {
-            message: format!("Unable to find file {}", filepath),
-            range: range.clone(),
-            file_id: file_id.into(),
-        },
+        DiagnosticResult::UnresolvedImport { range, filepath } => {
+            let line: u32 = range.start().into();
+            AnyDiagnostic::ParseError {
+                message: format!(
+                    "#import {} is not correctly formatted at line {}",
+                    filepath,
+                    line + 1
+                ),
+                range: range.clone(),
+                file_id: file_id.into(),
+            }
+        }
     }));
 
     let sema = Semantics::new(db);

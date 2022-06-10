@@ -2348,6 +2348,21 @@ fn parse_string_import() {
 
 #[test]
 
+fn parse_string_with_folders_import() {
+    check(
+        r#"#import ".\folder\file.wgsl""#,
+        expect![[r##"
+            SourceFile@0..28
+              Import@0..28
+                UnofficialPreprocessorImport@0..7 "#import"
+                Whitespace@7..8 " "
+                ImportPath@8..28
+                  StringLiteral@8..28 "\".\\folder\\file.wgsl\"""##]],
+    );
+}
+
+#[test]
+
 fn parse_switch_statement() {
     check_statement(
         r#"
