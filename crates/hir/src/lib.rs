@@ -520,11 +520,18 @@ impl Import {
 
         let module_info = db.module_info(import_loc.file_id);
         let import = module_info.get(import_loc.value);
+        let imports = db.custom_imports();
 
         match &import.value {
-            ImportValue::Path(_) => None, // TODO: path imports
+            ImportValue::Path(identifier) => {
+                let start = identifier.find('"').unwrap_or_default();
+                let (_, identifier) = identifier.split_at(start + 1);
+                let end = identifier.find('"').unwrap_or_default();
+                let (identifier, _) = identifier.split_at(end);
+                let source = imports.get(identifier)?;
+                Some(source.clone())
+            }
             ImportValue::Custom(key) => {
-                let imports = db.custom_imports();
                 let source = imports.get(key)?;
                 Some(source.clone())
             }
@@ -537,11 +544,21 @@ impl Import {
 
         let module_info = db.module_info(import_loc.file_id);
         let import = module_info.get(import_loc.value);
+        let imports = db.custom_imports();
 
         match &import.value {
-            ImportValue::Path(_) => Err(()),
+            ImportValue::Path(identifier) => {
+                let start = identifier.find('"').unwrap_or_default();
+                let (_, identifier) = identifier.split_at(start + 1);
+                let end = identifier.find('"').unwrap_or_default();
+                let (identifier, _) = identifier.split_at(end);
+                if imports.contains_key(identifier) {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            }
             ImportValue::Custom(key) => {
-                let imports = db.custom_imports();
                 if imports.contains_key(key) {
                     Ok(())
                 } else {

@@ -62,38 +62,41 @@ impl GlobalState {
             Event::Task(task) => match task {
                 Task::Response(response) => self.respond(response),
                 Task::Diagnostics(diagnostics_per_file) => {
-                    for (file_id, diagnostics) in diagnostics_per_file {
+                    for (file_id, mut diagnostics) in diagnostics_per_file {
                         //TODO: this is a bit of a hack, we should have a better way to
-                        for d in diagnostics.iter() {
+                        diagnostics.retain(|d| {
                             if d.message.starts_with(READ_FILE_TAG) {
                                 let identifier = d.message.replace(READ_FILE_TAG, "");
-                                let path = file_id_to_url(&self.vfs.read().unwrap().0, file_id);
-                                if let Ok(filepath) = path.join(&identifier) {
-                                    self.send_request::<lsp_ext::ReadFile>(
-                                        ReadFileInputParams {
-                                            identifier,
-                                            filepath: TextDocumentIdentifier::new(filepath),
-                                        },
-                                        |this, resp| {
-                                            let lsp_server::Response { error, result, .. } = resp;
-                                            if error.is_some() {
-                                                tracing::error!("Unable to read file");
-                                            }
-                                            if let Some(response) = result {
-                                                let output: ReadFileOutputParams =
-                                                    serde_json::from_value(response).unwrap();
-                                                let mut config = Config::clone(&*this.config);
-                                                config.custom_imports.insert(
-                                                    output.identifier,
-                                                    output.source,
-                                                );
-                                                this.update_configuration(config);
-                                            }
-                                        },
-                                    );
+                                if !self.config.custom_imports.contains_key(&identifier) {
+                                    let path = file_id_to_url(&self.vfs.read().unwrap().0, file_id);
+                                    if let Ok(filepath) = path.join(&identifier) {
+                                        self.send_request::<lsp_ext::ReadFile>(
+                                            ReadFileInputParams {
+                                                identifier,
+                                                filepath: TextDocumentIdentifier::new(filepath),
+                                            },
+                                            |this, resp| {
+                                                let lsp_servAer::Response {
+                                                    error: _, result, ..
+                                                } = resp;
+                                                if let Some(response) = result {
+                                                    let output: ReadFileOutputParams =
+                                                        serde_json::from_value(response).unwrap();
+                                                    let mut config = Config::clone(&*this.config);
+                                                    config
+                                                        .custom_imports
+                                                        .insert(output.identifier, output.source);
+                                                    this.update_configuration(config);
+                                                }
+                                            },
+                                        );
+                                    }
                                 }
+                                return false;
                             }
-                        }
+                            true
+                        });
+
                         self.diagnostics
                             .set_native_diagnostics(file_id, diagnostics)
                     }
