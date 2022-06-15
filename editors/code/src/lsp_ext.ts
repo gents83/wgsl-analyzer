@@ -22,12 +22,14 @@ export const fullSource = new lc.RequestType<FullSourceParams, string, void>("wg
 export const requestConfiguration = new lc.RequestType<void, unknown, void>("wgsl-analyzer/requestConfiguration");
 
 export interface ReadFileInputParams {
-    identifier: String,
+    identifier: string;
     filepath: lc.TextDocumentIdentifier;
+    original: lc.TextDocumentIdentifier;
 }
 export interface ReadFileOutputParams {
-    identifier: String,
+    identifier: string;
     filepath: lc.TextDocumentIdentifier;
+    original: lc.TextDocumentIdentifier;
     source: string;
 }
 export const readFile = new lc.RequestType<ReadFileInputParams, ReadFileOutputParams, void>("wgsl-analyzer/readFile");

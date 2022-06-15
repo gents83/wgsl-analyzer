@@ -66,6 +66,7 @@ impl Request for ReadFile {
 pub struct ReadFileInputParams {
     pub identifier: String,
     pub filepath: TextDocumentIdentifier,
+    pub original: TextDocumentIdentifier,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -73,6 +74,7 @@ pub struct ReadFileInputParams {
 pub struct ReadFileOutputParams {
     pub identifier: String,
     pub filepath: TextDocumentIdentifier,
+    pub original: TextDocumentIdentifier,
     pub source: String,
 }
 

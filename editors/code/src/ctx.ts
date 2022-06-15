@@ -79,7 +79,8 @@ export class Ctx {
             return {
                 identifier: params.identifier,
                 filepath: params.filepath,
-                source
+                original: params.original,
+                source,
             };
         }));
 
